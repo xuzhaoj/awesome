@@ -87,7 +87,7 @@ func (u *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
 		return
 	}
 
-	//是否是一个合法的手机号码
+	//是否是一个合法的手机号码，实际的开发需要使用正则表达式进行校验
 	if req.Phone == "" {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 4,
