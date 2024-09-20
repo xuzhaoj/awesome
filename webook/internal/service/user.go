@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var ErrUserDuplicateEmail = repository.ErrUserDuplicateEmail
+var ErrUserDuplicate = repository.ErrUserDuplicate
 var ErrInvalidUserOrPassword = errors.New("帐号/或者邮箱密码不对请重新登录")
 
 type UserService struct {
@@ -70,5 +70,29 @@ func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, err
 	user, err := svc.repo.FindById(ctx, id)
 	return user, err
 	//redis找不到从数据库中进行查找
+
+}
+
+func (svc *UserService) FindOrCreate(ctx context.Context,
+	phone string) (domain.User, error) {
+	//手机号查询用户存在与否
+	u, err := svc.repo.FindByPhone(ctx, phone)
+
+	//存在
+	if err != repository.ErrUserNotFound {
+		return u, err
+	}
+
+	//不存在，插入新用户
+	u = domain.User{
+		Phone: phone,
+	}
+	err = svc.repo.Create(ctx, u)
+	//存在错误,错误的返回是变量类型的就只返回变量类型
+	if err != nil && err != repository.ErrUserDuplicate {
+		return u, err
+	}
+	//逻辑就是创建完成后在查询一次
+	return svc.repo.FindByPhone(ctx, phone)
 
 }

@@ -43,6 +43,7 @@ func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 
 }
 
+// 校验验证码
 func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 	//前端传递过来的参数映射
 	type Req struct {
@@ -69,12 +70,33 @@ func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 		})
 		return
 	}
+
+	//手机号是新用户的时候怎么办，应该注册和查找的时候一并运行
+	user, err := u.svc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+
+	}
+	//设置token
+	if err = u.setJWTToken(ctx, user.Id); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
 	ctx.JSON(http.StatusOK, Result{
 		Code: 4,
 		Msg:  "验证码校验通过",
 	})
 }
 
+// 发送验证码
 func (u *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
 	//从前端传递过来的值进行json映射
 	type Req struct {
@@ -165,7 +187,7 @@ func (u *UserHandler) SingUp(context *gin.Context) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
-	if err == service.ErrUserDuplicateEmail {
+	if err == service.ErrUserDuplicate {
 		context.String(http.StatusOK, "邮箱冲突，请使用另外一个")
 		return
 
@@ -252,6 +274,17 @@ func (u *UserHandler) LoginJWT(context *gin.Context) {
 		return
 	}
 
+	if err = u.setJWTToken(context, user.Id); err != nil {
+		context.String(http.StatusOK, "系统错误")
+	}
+
+	fmt.Println(user)
+	context.String(http.StatusOK, "登录成功JWT")
+	return
+
+}
+
+func (u *UserHandler) setJWTToken(context *gin.Context, uid int64) error {
 	//*******************************************************************登陆成功****************************************************************************
 	//设置jwt登陆状态，生成jwttoken
 	//设置登录态，生成token
@@ -260,7 +293,7 @@ func (u *UserHandler) LoginJWT(context *gin.Context) {
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
 		},
-		Uid: user.Id,
+		Uid: uid,
 		//标识用户的软件和硬件信息
 		UserAgent: context.Request.UserAgent(),
 	}
@@ -268,15 +301,11 @@ func (u *UserHandler) LoginJWT(context *gin.Context) {
 	tokenStr, err := token.SignedString([]byte("iSQXg9EZhWMbSxYkExJaj4zbflnHCppl"))
 	if err != nil {
 		context.String(http.StatusInternalServerError, "系统错误")
-		return
+		return err
 	}
 	//在前响应头中塞进去
 	context.Header("x-jwt-token", tokenStr)
-	fmt.Println(user)
-	fmt.Println(tokenStr)
-	context.String(http.StatusOK, "登录成功JWT")
-	return
-
+	return nil
 }
 
 func (u *UserHandler) Edit(context *gin.Context) {

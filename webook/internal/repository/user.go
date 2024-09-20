@@ -5,11 +5,13 @@ import (
 	"awesomeProject/webook/internal/repository/cache"
 	"awesomeProject/webook/internal/repository/dao"
 	"context"
+	"database/sql"
+	"time"
 )
 
 var (
-	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
-	ErrUserNotFound       = dao.ErrUserNotFound
+	ErrUserDuplicate = dao.ErrUserDuplicate
+	ErrUserNotFound  = dao.ErrUserNotFound
 )
 
 //var ErrUserDuplicateEmailV1 = fmt.Errorf("%w 邮箱冲突", dao.ErrUserDuplicateEmail)
@@ -28,11 +30,9 @@ func NewUserRepository(dao *dao.UserDAO, cache *cache.UserCache) *UserRepository
 
 }
 
+// 查询出来的都是数据库的结果
 func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
-	return r.dao.Insert(ctx, dao.User{
-		Email:    u.Email,
-		Password: u.Password,
-	})
+	return r.dao.Insert(ctx, r.domainToEntity(u))
 
 }
 
@@ -48,11 +48,13 @@ func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, e
 	if err != nil {
 		return domain.User{}, err
 	}
-	u = domain.User{
-		Id:       u1.Id,
-		Email:    u1.Email,
-		Password: u1.Password,
-	}
+	//领域用户对象，由于notnull使用用新的方法生成进行复用
+	//u = domain.User{
+	//	Id:       u1.Id,
+	//	Email:    u1.Email,
+	//	Password: u1.Password,
+	//}
+	u = r.entityToDomain(u1)
 	//查完数据库用户信息还是应该放进redis中
 	err = r.cache.Set(ctx, u)
 	if err != nil {
@@ -73,13 +75,46 @@ func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, e
 // 根据邮箱返回用户和错误信息
 func (r *UserRepository) FindByEmail(ctx context.Context, u domain.User) (domain.User, error) {
 	email := u.Email
+	//查询出来的是数据库的用户需要转化成domain
 	user, err := r.dao.FindByEmail(ctx, email)
 	if err != nil {
 		return domain.User{}, err
 	}
+	return r.entityToDomain(user), nil
+}
+
+func (r *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	user, err := r.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return r.entityToDomain(user), nil
+}
+
+func (r *UserRepository) domainToEntity(u domain.User) dao.User {
+	//领域用户类与数据库用户类进行转化
+	return dao.User{
+		Id: u.Id,
+		Email: sql.NullString{
+			String: u.Email,
+			Valid:  u.Email != "",
+		},
+		Password: u.Password,
+		Phone: sql.NullString{
+			String: u.Phone,
+			Valid:  u.Phone != "",
+		},
+		Ctime: u.Ctime.UnixMilli(),
+	}
+
+}
+
+func (r *UserRepository) entityToDomain(u dao.User) domain.User {
 	return domain.User{
-		Id:       user.Id,
-		Email:    user.Email,
-		Password: user.Password,
-	}, nil
+		Id:       u.Id,
+		Email:    u.Email.String,
+		Password: u.Password,
+		Phone:    u.Phone.String,
+		Ctime:    time.UnixMilli(u.Ctime),
+	}
 }
