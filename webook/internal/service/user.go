@@ -11,21 +11,30 @@ import (
 var ErrUserDuplicate = repository.ErrUserDuplicate
 var ErrInvalidUserOrPassword = errors.New("帐号/或者邮箱密码不对请重新登录")
 
-type UserService struct {
+type UserService interface {
+	SignUp(ctx context.Context, u domain.User) error
+	Login(ctx context.Context, u domain.User) (domain.User, error)
+	Profile(ctx context.Context, id int64) (domain.User, error)
+	FindOrCreate(ctx context.Context,
+		phone string) (domain.User, error)
+}
+
+type userService struct {
 
 	//对象用指针方便
-	repo *repository.UserRepository
+	repo repository.UserRepository
 	//redis *redis.Client,,,,,,,涉及到数据层面的操作的时候可以丢费repository去做
 }
 
 // 返回这个service的对象
-func NewUserService(repo *repository.UserRepository) *UserService {
+func NewUserService(repo repository.UserRepository) UserService {
 	//现场定义结构体的内容
-	return &UserService{repo: repo}
+	return &userService{
+		repo: repo}
 
 }
 
-func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
+func (svc *userService) SignUp(ctx context.Context, u domain.User) error {
 	//用指针还需要去排空,所以不去用User的指针,不可以调用上层定义好的结构体,只允许用下层定义好的
 	//思考加密存放在哪里
 	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
@@ -42,7 +51,7 @@ func (svc *UserService) SignUp(ctx context.Context, u domain.User) error {
 	//return err
 }
 
-func (svc *UserService) Login(ctx context.Context, u domain.User) (domain.User, error) {
+func (svc *userService) Login(ctx context.Context, u domain.User) (domain.User, error) {
 	//u是传递下来的,user是查询后的结果,两者进行密码的比较
 	//登录的逻辑,根据邮箱找到数据库用户信息
 
@@ -66,14 +75,14 @@ func (svc *UserService) Login(ctx context.Context, u domain.User) (domain.User, 
 	return user, nil
 }
 
-func (svc *UserService) Profile(ctx context.Context, id int64) (domain.User, error) {
+func (svc *userService) Profile(ctx context.Context, id int64) (domain.User, error) {
 	user, err := svc.repo.FindById(ctx, id)
 	return user, err
 	//redis找不到从数据库中进行查找
 
 }
 
-func (svc *UserService) FindOrCreate(ctx context.Context,
+func (svc *userService) FindOrCreate(ctx context.Context,
 	phone string) (domain.User, error) {
 	//手机号查询用户存在与否
 	u, err := svc.repo.FindByPhone(ctx, phone)

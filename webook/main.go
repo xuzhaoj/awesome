@@ -32,7 +32,7 @@ func main() {
 	server.Run(":8080")
 }
 
-// wire_go生成的代码直接复制过来就行了因为有bug
+// // wire_go生成的代码直接复制过来就行了因为有bug
 func InitWebServer() *gin.Engine {
 	cmdable := ioc.InitRedis()
 	v := ioc.InitMiddlewares(cmdable)

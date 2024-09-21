@@ -14,18 +14,25 @@ var (
 	ErrUserNotFound  = gorm.ErrRecordNotFound
 )
 
-type UserDAO struct {
+type UserDAO interface {
+	FindByEmail(ctx context.Context, email string) (User, error)
+	FindByPhone(ctx context.Context, phone string) (User, error)
+	FindById(ctx context.Context, id int64) (User, error)
+	Insert(ctx context.Context, u User) error
+}
+
+type GORMUserDAO struct {
 	//使用了Gorm中的对他进行处理
 	db *gorm.DB
 }
 
-func NewUserDao(db *gorm.DB) *UserDAO {
-	return &UserDAO{
+func NewUserDao(db *gorm.DB) UserDAO {
+	return &GORMUserDAO{
 		db: db,
 	}
 }
 
-func (dao *UserDAO) Insert(ctx context.Context, u User) error {
+func (dao *GORMUserDAO) Insert(ctx context.Context, u User) error {
 	//毫秒数
 	now := time.Now().UnixMilli()
 	u.Ctime = now
@@ -43,7 +50,7 @@ func (dao *UserDAO) Insert(ctx context.Context, u User) error {
 
 }
 
-func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+func (dao *GORMUserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	//用于存储查询结果
 	var u User
 	//First 方法来获取第一条匹配的记录，并将结果存储到 u 变量中,GORM ，没有错误信息，赋值过程在返回错误 nil表明查询准确无物
@@ -52,7 +59,7 @@ func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error)
 	return u, err
 }
 
-func (dao *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+func (dao *GORMUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
 	//用于存储查询结果
 	var u User
 	//First 方法来获取第一条匹配的记录，并将结果存储到 u 变量中,GORM ，没有错误信息，赋值过程在返回错误 nil表明查询准确无物
@@ -60,7 +67,7 @@ func (dao *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error)
 	//err := dao.db.WithContext(ctx).First(&u, "email = ?", email).Error
 	return u, err
 }
-func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
+func (dao *GORMUserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	//用于存储查询结果
 	var u User
 	//First 方法来获取第一条匹配的记录，并将结果存储到 u 变量中,GORM ，没有错误信息，赋值过程在返回错误 nil表明查询准确无物

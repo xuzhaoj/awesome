@@ -16,14 +16,21 @@ var (
 
 //var ErrUserDuplicateEmailV1 = fmt.Errorf("%w 邮箱冲突", dao.ErrUserDuplicateEmail)
 
-// 指针指向的是这个结构体，然后去调用作用在结构体上面的方法
-type UserRepository struct {
-	dao   *dao.UserDAO
-	cache *cache.UserCache
+type UserRepository interface {
+	Create(ctx context.Context, u domain.User) error
+	FindById(ctx context.Context, id int64) (domain.User, error)
+	FindByEmail(ctx context.Context, u domain.User) (domain.User, error)
+	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 }
 
-func NewUserRepository(dao *dao.UserDAO, cache *cache.UserCache) *UserRepository {
-	return &UserRepository{
+// 指针指向的是这个结构体，然后去调用作用在结构体上面的方法
+type CachedUserRepository struct {
+	dao   dao.UserDAO
+	cache cache.UserCache
+}
+
+func NewUserRepository(dao dao.UserDAO, cache cache.UserCache) UserRepository {
+	return &CachedUserRepository{
 		dao:   dao,
 		cache: cache,
 	}
@@ -31,12 +38,12 @@ func NewUserRepository(dao *dao.UserDAO, cache *cache.UserCache) *UserRepository
 }
 
 // 查询出来的都是数据库的结果
-func (r *UserRepository) Create(ctx context.Context, u domain.User) error {
+func (r *CachedUserRepository) Create(ctx context.Context, u domain.User) error {
 	return r.dao.Insert(ctx, r.domainToEntity(u))
 
 }
 
-func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
+func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
 
 	//先从cache里面找
 	u, err := r.cache.Get(ctx, id)
@@ -73,7 +80,7 @@ func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, e
 }
 
 // 根据邮箱返回用户和错误信息
-func (r *UserRepository) FindByEmail(ctx context.Context, u domain.User) (domain.User, error) {
+func (r *CachedUserRepository) FindByEmail(ctx context.Context, u domain.User) (domain.User, error) {
 	email := u.Email
 	//查询出来的是数据库的用户需要转化成domain
 	user, err := r.dao.FindByEmail(ctx, email)
@@ -83,7 +90,7 @@ func (r *UserRepository) FindByEmail(ctx context.Context, u domain.User) (domain
 	return r.entityToDomain(user), nil
 }
 
-func (r *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+func (r *CachedUserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
 	user, err := r.dao.FindByPhone(ctx, phone)
 	if err != nil {
 		return domain.User{}, err
@@ -91,7 +98,7 @@ func (r *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.
 	return r.entityToDomain(user), nil
 }
 
-func (r *UserRepository) domainToEntity(u domain.User) dao.User {
+func (r *CachedUserRepository) domainToEntity(u domain.User) dao.User {
 	//领域用户类与数据库用户类进行转化
 	return dao.User{
 		Id: u.Id,
@@ -109,7 +116,7 @@ func (r *UserRepository) domainToEntity(u domain.User) dao.User {
 
 }
 
-func (r *UserRepository) entityToDomain(u dao.User) domain.User {
+func (r *CachedUserRepository) entityToDomain(u dao.User) domain.User {
 	return domain.User{
 		Id:       u.Id,
 		Email:    u.Email.String,
