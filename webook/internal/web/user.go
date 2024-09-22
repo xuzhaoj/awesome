@@ -182,6 +182,10 @@ func (u *UserHandler) SingUp(context *gin.Context) {
 		return
 
 	}
+	if req.ConfirmPassword != req.Password {
+		context.String(http.StatusOK, "两次输入的密码不一致,请重新输入")
+		return
+	}
 	//err已经声明过了就不要在:=
 	err = u.svc.SignUp(context, domain.User{
 		Email:    req.Email,
@@ -194,10 +198,7 @@ func (u *UserHandler) SingUp(context *gin.Context) {
 	}
 	if err != nil {
 		context.String(http.StatusOK, "系统错误")
-	}
-
-	if req.ConfirmPassword != req.Password {
-		context.String(http.StatusOK, "两次输入的密码不一致,请重新输入")
+		return
 	} else {
 		context.String(http.StatusOK, "注册成功")
 		fmt.Printf("%v", req)

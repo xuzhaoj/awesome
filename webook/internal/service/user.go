@@ -75,6 +75,7 @@ func (svc *userService) Login(ctx context.Context, u domain.User) (domain.User, 
 	return user, nil
 }
 
+// 用户详情信息
 func (svc *userService) Profile(ctx context.Context, id int64) (domain.User, error) {
 	user, err := svc.repo.FindById(ctx, id)
 	return user, err
