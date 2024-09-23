@@ -47,9 +47,13 @@ func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.U
 
 	//先从cache里面找
 	u, err := r.cache.Get(ctx, id)
-	if err != nil {
+
+	//先走成功的逻辑
+	if err == nil {
+		//查询到了数据，查找成功
 		return u, err
 	}
+	//查询失败的情况
 	//查询数据库
 	u1, err := r.dao.FindById(ctx, id)
 	if err != nil {
@@ -63,13 +67,12 @@ func (r *CachedUserRepository) FindById(ctx context.Context, id int64) (domain.U
 	//}
 	u = r.entityToDomain(u1)
 	//查完数据库用户信息还是应该放进redis中
-	err = r.cache.Set(ctx, u)
-	if err != nil {
-		//打印日志做监控
-	}
+	_ = r.cache.Set(ctx, u)
+	//if err != nil {
+	//	//打印日志做监控
+	//}
 
-	return u, err
-
+	return u, nil
 	//1.缓存里面有数据
 
 	//2.缓存里面没有数据
