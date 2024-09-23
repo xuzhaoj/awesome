@@ -1,6 +1,7 @@
 package tencent
 
 import (
+	"awesomeProject/webook/pkg/ratelimit"
 	"context"
 	"fmt"
 	"github.com/ecodeclub/ekit"
@@ -12,19 +13,22 @@ type Service struct {
 	appId    *string
 	signName *string
 	client   *sms.Client
+	limiter  ratelimit.Limiter
 }
 
 // 构造函数
-func NewService(client *sms.Client, appId string, signName string) *Service {
+func NewService(client *sms.Client, appId string, signName string, limiter ratelimit.Limiter) *Service {
 	return &Service{
 		client: client,
 		//将传入的值转化为指针类型
 		appId:    ekit.ToPtr[string](appId),
 		signName: ekit.ToPtr[string](signName),
+		limiter:  limiter,
 	}
 
 }
 func (s *Service) Send(ctx context.Context, tplId string, args []string, numbers ...string) error {
+
 	req := sms.NewSendSmsRequest()
 	req.SmsSdkAppId = s.appId
 	req.SignName = s.signName
