@@ -3,6 +3,7 @@ package service
 import (
 	"awesomeProject/webook/internal/domain"
 	"awesomeProject/webook/internal/repository"
+	"awesomeProject/webook/pkg/logger"
 	"context"
 	"errors"
 	"golang.org/x/crypto/bcrypt"
@@ -23,14 +24,17 @@ type userService struct {
 
 	//对象用指针方便
 	repo repository.UserRepository
+	l    logger.LoggerV1
 	//redis *redis.Client,,,,,,,涉及到数据层面的操作的时候可以丢费repository去做
 }
 
 // 返回这个service的对象
-func NewUserService(repo repository.UserRepository) UserService {
+func NewUserService(repo repository.UserRepository, l logger.LoggerV1) UserService {
 	//现场定义结构体的内容
 	return &userService{
-		repo: repo}
+		repo: repo,
+		l:    l,
+	}
 
 }
 
@@ -92,7 +96,9 @@ func (svc *userService) FindOrCreate(ctx context.Context,
 	if err != repository.ErrUserNotFound {
 		return u, err
 	}
-
+	//zap.L().Info("用户未注册", zap.String("phone", phone))
+	//svc.logger.Info("用户未注册", zap.String("phone", phone))
+	svc.l.Info("用户未注册", logger.String("phone", phone))
 	//不存在，插入新用户
 	u = domain.User{
 		Phone: phone,

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
 // 编译器会在编译的时候将变量放进来这个变量里面
@@ -47,6 +48,9 @@ func (c *RedisCodeCache) Set(ctx context.Context, biz, phone, code string) error
 	case 0:
 		return nil
 	case -1:
+		zap.L().Warn("短信发送频繁",
+			zap.String("biz", biz),
+			zap.String("phone", phone))
 		return ErrCodeSendTooMany
 	default:
 		return errors.New("系统错误")

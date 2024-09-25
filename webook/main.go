@@ -7,15 +7,19 @@ import (
 	"awesomeProject/webook/internal/service"
 	"awesomeProject/webook/internal/web"
 	"awesomeProject/webook/ioc"
+	"errors"
+	"github.com/spf13/viper"
 	"net/http"
-
 	//Gin框架API
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func main() {
 	//db := initDB()
 	//
+	initViper()
+	initLogger()
 	server := InitWebServer()
 	//
 	//rdb := initRedis()
@@ -31,16 +35,19 @@ func main() {
 	})
 	server.Run(":8080")
 }
+func InitWebServer1() {
 
-// // wire_go生成的代码直接复制过来就行了因为有bug
+}
+
 func InitWebServer() *gin.Engine {
 	cmdable := ioc.InitRedis()
-	v := ioc.InitMiddlewares(cmdable)
-	db := ioc.InitDB()
+	loggerV1 := ioc.InitLogger()
+	v := ioc.InitMiddlewares(cmdable, loggerV1)
+	db := ioc.InitDB(loggerV1)
 	userDAO := dao.NewUserDao(db)
 	userCache := cache.NewUserCache(cmdable)
 	userRepository := repository.NewUserRepository(userDAO, userCache)
-	userService := service.NewUserService(userRepository)
+	userService := service.NewUserService(userRepository, loggerV1)
 	codeCache := cache.NewCodeCache(cmdable)
 	codeRepository := repository.NewCodeRepository(codeCache)
 	smsService := ioc.InitSMSService()
@@ -48,6 +55,37 @@ func InitWebServer() *gin.Engine {
 	userHandler := web.NewUserHandler(userService, codeService)
 	engine := ioc.InitWebServer(v, userHandler)
 	return engine
+}
+
+func initLogger() {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	zap.L().Info("这是replace之前")
+	zap.ReplaceGlobals(logger)
+	zap.L().Info("hello，你初始化log成功")
+	type Demo struct {
+		Name string `json:"name"`
+	}
+	zap.L().Info("这是实验参数", zap.Error(errors.New("这是一个error")),
+		zap.Int64("id", 123),
+		zap.Any("一个结构体", Demo{Name: "hello"}))
+
+}
+func initViper() {
+	viper.SetDefault("db.mysql.dsn", "root:root@tcp(webook-live-mysql:11309)/webook")
+	viper.SetConfigName("dev")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./webook/config")
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		panic(err)
+	}
+	//可以有多个viper实例对象
+	//otherViper := viper.New()
+
 }
 
 //func initRedis() redis.Cmdable {

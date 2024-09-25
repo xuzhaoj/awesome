@@ -23,12 +23,15 @@ func InitWebServer() *gin.Engine {
 		repository.NewCodeRepository,
 		service.NewUserService,
 		service.NewCodeService,
+
 		//给予内存实现对应不上
 		ioc.InitSMSService,
+
 		web.NewUserHandler,
 		//中间件，注册路由呢
 		ioc.InitWebServer,
 		ioc.InitMiddlewares,
+		ioc.InitLogger,
 	)
 
 	//分配内存，返回一个gin.engine类型的指针
