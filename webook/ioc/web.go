@@ -15,11 +15,12 @@ import (
 	"time"
 )
 
-func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler) *gin.Engine {
+func InitWebServer(mdls []gin.HandlerFunc, hdl *web.UserHandler, articleHdl *web.ArticleHandler) *gin.Engine {
 	server := gin.Default()
 	//中间件 make定义
 	server.Use(mdls...)
 	hdl.RegisterRoutes(server)
+	articleHdl.RegisterRoutes(server)
 	return server
 }
 

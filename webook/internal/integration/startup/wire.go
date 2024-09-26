@@ -1,6 +1,6 @@
 //go:build wireinject
 
-package integration
+package startup
 
 import (
 	"awesomeProject/webook/internal/repository"
@@ -13,25 +13,72 @@ import (
 	"github.com/google/wire"
 )
 
+var thirdProvider = wire.NewSet( // 第三方依赖
+	InitRedis, InitDB,
+	InitLogger)
+
+var userSvcProvider = wire.NewSet(
+	dao.NewUserDao,
+	cache.NewUserCache,
+	repository.NewUserRepository,
+	service.NewUserService)
+
+//var articlSvcProvider = wire.NewSet(
+//	repository.NewCachedArticleRepository,
+//	cache.NewArticleRedisCache,
+//	dao.NewArticleGORMDAO,
+//	service.NewArticleService)
+
 func InitWebServer() *gin.Engine {
-	//自动生成依赖注入
-	wire.Build(ioc.InitDB, ioc.InitRedis,
-		dao.NewUserDao,
-		cache.NewUserCache,
+	wire.Build(
+		thirdProvider,
+		userSvcProvider,
+		//articlSvcProvider,
+		// cache 部分
 		cache.NewCodeCache,
-		repository.NewUserRepository,
+		dao.NewGORMArticleDao,
+		// repository 部分
 		repository.NewCodeRepository,
-		service.NewUserService,
-		service.NewCodeService,
-		//给予内存实现对应不上
+		repository.NewArticleRepository,
+
+		// Service 部分
 		ioc.InitSMSService,
+		service.NewCodeService,
+		service.NewArticleService,
+		//InitWechatService,
+
+		// handler 部分
 		web.NewUserHandler,
-		//中间件，注册路由呢
-		ioc.InitWebServer,
+		web.NewArticleHandler,
+		//web.NewOAuth2WechatHandler,
+		//ijwt.NewRedisJWTHandler,
 		ioc.InitMiddlewares,
+		ioc.InitWebServer,
 	)
-
-	//分配内存，返回一个gin.engine类型的指针
 	return gin.Default()
-
 }
+
+// 不需要注入那么多的东西所以直接
+func InitArticleHandler() *web.ArticleHandler {
+	wire.Build(
+		thirdProvider,
+		//userSvcProvider,
+		//repository.NewCachedArticleRepository,
+		//cache.NewArticleRedisCache,
+		dao.NewGORMArticleDao,
+		service.NewArticleService,
+		web.NewArticleHandler,
+		repository.NewArticleRepository,
+	)
+	return &web.ArticleHandler{}
+}
+
+func InitUserSvc() service.UserService {
+	wire.Build(thirdProvider, userSvcProvider)
+	return service.NewUserService(nil, nil)
+}
+
+//func InitJwtHdl() ijwt.Handler {
+//	wire.Build(thirdProvider, ijwt.NewRedisJWTHandler)
+//	return ijwt.NewRedisJWTHandler(nil)
+//}

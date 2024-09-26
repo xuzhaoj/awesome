@@ -1,16 +1,12 @@
 package integration
 
 import (
-	"awesomeProject/webook/internal/repository"
-	"awesomeProject/webook/internal/repository/cache"
-	"awesomeProject/webook/internal/repository/dao"
-	"awesomeProject/webook/internal/service"
+	"awesomeProject/webook/internal/integration/startup"
 	"awesomeProject/webook/internal/web"
 	"awesomeProject/webook/ioc"
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -20,7 +16,7 @@ import (
 )
 
 func TestUserHandler_e2e_SendLoginSMSCode(t *testing.T) {
-	server := InitWebServer()
+	server := startup.InitWebServer()
 	rdb := ioc.InitRedis()
 	testCases := []struct {
 		name string
@@ -176,20 +172,24 @@ func TestUserHandler_e2e_SendLoginSMSCode(t *testing.T) {
 	}
 
 }
-func InitWebServer() *gin.Engine {
-	cmdable := ioc.InitRedis()
-	v := ioc.InitMiddlewares(cmdable)
-	db := ioc.InitDB()
-	userDAO := dao.NewUserDao(db)
-	userCache := cache.NewUserCache(cmdable)
-	userRepository := repository.NewUserRepository(userDAO, userCache)
-	userService := service.NewUserService(userRepository)
-	codeCache := cache.NewCodeCache(cmdable)
-	codeRepository := repository.NewCodeRepository(codeCache)
-	smsService := ioc.InitSMSService()
-	codeService := service.NewCodeService(codeRepository, smsService)
-	userHandler := web.NewUserHandler(userService, codeService)
-	engine := ioc.InitWebServer(v, userHandler)
-	return engine
 
-}
+//
+//func InitWebServer() *gin.Engine {
+//	cmdable := startup.InitRedis()
+//	loggerV1 := startup.InitLogger()
+//	v := ioc.InitMiddlewares(cmdable, loggerV1)
+//	db := startup.InitDB()
+//	userDAO := dao.NewUserDao(db)
+//	userCache := cache.NewUserCache(cmdable)
+//	userRepository := repository.NewUserRepository(userDAO, userCache)
+//	userService := service.NewUserService(userRepository, loggerV1)
+//	codeCache := cache.NewCodeCache(cmdable)
+//	codeRepository := repository.NewCodeRepository(codeCache)
+//	smsService := ioc.InitSMSService()
+//	codeService := service.NewCodeService(codeRepository, smsService)
+//	userHandler := web.NewUserHandler(userService, codeService)
+//	articleService := service.NewArticleService()
+//	articleHandler := web.NewArticleHandler(articleService, loggerV1)
+//	engine := ioc.InitWebServer(v, userHandler, articleHandler)
+//	return engine
+//}

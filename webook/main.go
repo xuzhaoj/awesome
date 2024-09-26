@@ -1,12 +1,6 @@
 package main
 
 import (
-	"awesomeProject/webook/internal/repository"
-	"awesomeProject/webook/internal/repository/cache"
-	"awesomeProject/webook/internal/repository/dao"
-	"awesomeProject/webook/internal/service"
-	"awesomeProject/webook/internal/web"
-	"awesomeProject/webook/ioc"
 	"errors"
 	"github.com/spf13/viper"
 	"net/http"
@@ -39,23 +33,24 @@ func InitWebServer1() {
 
 }
 
-func InitWebServer() *gin.Engine {
-	cmdable := ioc.InitRedis()
-	loggerV1 := ioc.InitLogger()
-	v := ioc.InitMiddlewares(cmdable, loggerV1)
-	db := ioc.InitDB(loggerV1)
-	userDAO := dao.NewUserDao(db)
-	userCache := cache.NewUserCache(cmdable)
-	userRepository := repository.NewUserRepository(userDAO, userCache)
-	userService := service.NewUserService(userRepository, loggerV1)
-	codeCache := cache.NewCodeCache(cmdable)
-	codeRepository := repository.NewCodeRepository(codeCache)
-	smsService := ioc.InitSMSService()
-	codeService := service.NewCodeService(codeRepository, smsService)
-	userHandler := web.NewUserHandler(userService, codeService)
-	engine := ioc.InitWebServer(v, userHandler)
-	return engine
-}
+//
+//func InitWebServer() *gin.Engine {
+//	cmdable := ioc.InitRedis()
+//	loggerV1 := ioc.InitLogger()
+//	v := ioc.InitMiddlewares(cmdable, loggerV1)
+//	db := ioc.InitDB(loggerV1)
+//	userDAO := dao.NewUserDao(db)
+//	userCache := cache.NewUserCache(cmdable)
+//	userRepository := repository.NewUserRepository(userDAO, userCache)
+//	userService := service.NewUserService(userRepository, loggerV1)
+//	codeCache := cache.NewCodeCache(cmdable)
+//	codeRepository := repository.NewCodeRepository(codeCache)
+//	smsService := ioc.InitSMSService()
+//	codeService := service.NewCodeService(codeRepository, smsService)
+//	userHandler := web.NewUserHandler(userService, codeService)
+//	engine := ioc.InitWebServer(v, userHandler)
+//	return engine
+//}
 
 func initLogger() {
 	logger, err := zap.NewDevelopment()

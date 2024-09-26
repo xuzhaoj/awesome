@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"net/http"
 	"regexp"
-	"time"
 )
 
 // 定义与用户有关的路由
@@ -19,6 +17,8 @@ const biz = "login"
 type UserHandler struct {
 	svc     service.UserService
 	codeSvc service.CodeService
+	//Go 的匿名嵌入（也称为“组合”）允许外层结构体自动“继承”嵌入结构体的方法和字段
+	jwtHandler
 }
 
 func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
@@ -86,10 +86,12 @@ func (u *UserHandler) LoginSMS(ctx *gin.Context) {
 
 	}
 	//设置token
+
 	if err = u.setJWTToken(ctx, user.Id); err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
+			//jwt.NewWithClaims(),
 		})
 		return
 	}
@@ -291,29 +293,29 @@ func (u *UserHandler) LoginJWT(context *gin.Context) {
 
 }
 
-func (u *UserHandler) setJWTToken(context *gin.Context, uid int64) error {
-	//*******************************************************************登陆成功****************************************************************************
-	//设置jwt登陆状态，生成jwttoken
-	//设置登录态，生成token
-	//带userID
-	claims := UserClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
-		},
-		Uid: uid,
-		//标识用户的软件和硬件信息
-		UserAgent: context.Request.UserAgent(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	tokenStr, err := token.SignedString([]byte("iSQXg9EZhWMbSxYkExJaj4zbflnHCppl"))
-	if err != nil {
-		context.String(http.StatusInternalServerError, "系统错误")
-		return err
-	}
-	//在前响应头中塞进去
-	context.Header("x-jwt-token", tokenStr)
-	return nil
-}
+//func (u *UserHandler) setJWTToken(context *gin.Context, uid int64) error {
+//	//*******************************************************************登陆成功****************************************************************************
+//	//设置jwt登陆状态，生成jwttoken
+//	//设置登录态，生成token
+//	//带userID
+//	claims := UserClaims{
+//		RegisteredClaims: jwt.RegisteredClaims{
+//			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
+//		},
+//		Uid: uid,
+//		//标识用户的软件和硬件信息
+//		UserAgent: context.Request.UserAgent(),
+//	}
+//	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+//	tokenStr, err := token.SignedString([]byte("iSQXg9EZhWMbSxYkExJaj4zbflnHCppl"))
+//	if err != nil {
+//		context.String(http.StatusInternalServerError, "系统错误")
+//		return err
+//	}
+//	//在前响应头中塞进去
+//	context.Header("x-jwt-token", tokenStr)
+//	return nil
+//}
 
 func (u *UserHandler) Edit(context *gin.Context) {
 
@@ -349,11 +351,4 @@ func (u *UserHandler) Logout(context *gin.Context) {
 	sess.Save()
 	context.String(http.StatusOK, "退出登录成功")
 
-}
-
-type UserClaims struct {
-	jwt.RegisteredClaims
-	//声明要放进去token里面的数据
-	Uid       int64
-	UserAgent string
 }
