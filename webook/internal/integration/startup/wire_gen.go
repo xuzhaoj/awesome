@@ -8,6 +8,7 @@ package startup
 
 import (
 	"awesomeProject/webook/internal/repository"
+	"awesomeProject/webook/internal/repository/article"
 	"awesomeProject/webook/internal/repository/cache"
 	"awesomeProject/webook/internal/repository/dao"
 	"awesomeProject/webook/internal/service"
@@ -34,7 +35,7 @@ func InitWebServer() *gin.Engine {
 	codeService := service.NewCodeService(codeRepository, smsService)
 	userHandler := web.NewUserHandler(userService, codeService)
 	articleDao := dao.NewGORMArticleDao(db)
-	articleRepository := repository.NewArticleRepository(articleDao)
+	articleRepository := article.NewArticleRepository(articleDao)
 	articleService := service.NewArticleService(articleRepository)
 	articleHandler := web.NewArticleHandler(articleService, loggerV1)
 	engine := ioc.InitWebServer(v, userHandler, articleHandler)
@@ -45,7 +46,7 @@ func InitWebServer() *gin.Engine {
 func InitArticleHandler() *web.ArticleHandler {
 	db := InitDB()
 	articleDao := dao.NewGORMArticleDao(db)
-	articleRepository := repository.NewArticleRepository(articleDao)
+	articleRepository := article.NewArticleRepository(articleDao)
 	articleService := service.NewArticleService(articleRepository)
 	loggerV1 := InitLogger()
 	articleHandler := web.NewArticleHandler(articleService, loggerV1)

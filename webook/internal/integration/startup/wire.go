@@ -4,6 +4,7 @@ package startup
 
 import (
 	"awesomeProject/webook/internal/repository"
+	"awesomeProject/webook/internal/repository/article"
 	"awesomeProject/webook/internal/repository/cache"
 	"awesomeProject/webook/internal/repository/dao"
 	"awesomeProject/webook/internal/service"
@@ -39,7 +40,7 @@ func InitWebServer() *gin.Engine {
 		dao.NewGORMArticleDao,
 		// repository 部分
 		repository.NewCodeRepository,
-		repository.NewArticleRepository,
+		article.NewArticleRepository,
 
 		// Service 部分
 		ioc.InitSMSService,
@@ -68,7 +69,7 @@ func InitArticleHandler() *web.ArticleHandler {
 		dao.NewGORMArticleDao,
 		service.NewArticleService,
 		web.NewArticleHandler,
-		repository.NewArticleRepository,
+		article.NewArticleRepository,
 	)
 	return &web.ArticleHandler{}
 }

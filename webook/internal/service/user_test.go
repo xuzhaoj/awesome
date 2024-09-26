@@ -4,6 +4,7 @@ import (
 	"awesomeProject/webook/internal/domain"
 	"awesomeProject/webook/internal/repository"
 	repomocks "awesomeProject/webook/internal/repository/mocks"
+	"awesomeProject/webook/pkg/logger"
 	"context"
 	"errors"
 	"github.com/stretchr/testify/assert"
@@ -123,7 +124,7 @@ func Test_userService_Login(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			svc := NewUserService(tc.mock(ctrl))
+			svc := NewUserService(tc.mock(ctrl), &logger.NopLogger{})
 			user, err := svc.Login(context.Background(), tc.u)
 			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantUser, user)

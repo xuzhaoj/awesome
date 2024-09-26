@@ -24,19 +24,49 @@ func NewArticleHandler(svc service.ArticleService, l logger.LoggerV1) *ArticleHa
 func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/articles")
 	g.POST("/edit", h.Edit)
+	g.POST("/publish", h.Publish)
+
+}
+func (h *ArticleHandler) Publish(ctx *gin.Context) {
+	var req ArticleReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	//获取用户登录的id
+	c := ctx.MustGet("claims")
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("未发现用户的session")
+		return
+	}
+
+	id, err := h.svc.Publish(ctx, req.toDomain(claims.Uid))
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("发表帖子失败", logger.Error(err))
+		return
+	}
+	//模拟的是这里的ok
+	ctx.JSON(http.StatusOK, Result{
+		Msg:  "OK",
+		Data: id,
+	})
 
 }
 
 //1.定义Handle结构体，注册路由，编写路由方法，考虑路由方法需要传递的参数构造响应结构体
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
-	type Req struct {
-		//修改可以获得文章的id
-		Id      int64  `json:"id"`
-		Title   string `json:"title"`
-		Content string `json:"content"`
-	}
-	var req Req
+
+	var req ArticleReq
+
 	if err := ctx.Bind(&req); err != nil {
 		return
 	}
@@ -75,4 +105,23 @@ func (h *ArticleHandler) Edit(ctx *gin.Context) {
 		Msg:  "OK",
 		Data: id,
 	})
+}
+
+type ArticleReq struct {
+	//修改可以获得文章的id
+	Id      int64  `json:"id"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+func (req ArticleReq) toDomain(uid int64) domain.Article {
+	return domain.Article{
+		Id:      req.Id,
+		Title:   req.Title,
+		Content: req.Content,
+		Author: domain.Author{
+			Id: uid,
+		},
+	}
+
 }
