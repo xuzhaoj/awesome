@@ -7,6 +7,7 @@ import (
 	"awesomeProject/webook/internal/repository/article"
 	"awesomeProject/webook/internal/repository/cache"
 	"awesomeProject/webook/internal/repository/dao"
+	article2 "awesomeProject/webook/internal/repository/dao/article"
 	"awesomeProject/webook/internal/service"
 	"awesomeProject/webook/internal/web"
 	"awesomeProject/webook/ioc"
@@ -37,7 +38,7 @@ func InitWebServer() *gin.Engine {
 		//articlSvcProvider,
 		// cache 部分
 		cache.NewCodeCache,
-		dao.NewGORMArticleDao,
+		article2.NewGORMArticleDao,
 		// repository 部分
 		repository.NewCodeRepository,
 		article.NewArticleRepository,
@@ -66,7 +67,7 @@ func InitArticleHandler() *web.ArticleHandler {
 		//userSvcProvider,
 		//repository.NewCachedArticleRepository,
 		//cache.NewArticleRedisCache,
-		dao.NewGORMArticleDao,
+		article2.NewGORMArticleDao,
 		service.NewArticleService,
 		web.NewArticleHandler,
 		article.NewArticleRepository,

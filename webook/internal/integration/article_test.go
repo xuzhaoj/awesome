@@ -2,7 +2,7 @@ package integration
 
 import (
 	"awesomeProject/webook/internal/integration/startup"
-	"awesomeProject/webook/internal/repository/dao"
+	"awesomeProject/webook/internal/repository/dao/article"
 	"awesomeProject/webook/internal/web"
 	"bytes"
 	"encoding/json"
@@ -65,14 +65,14 @@ func (s *ArticleTestSuite) TestEdit() {
 			},
 			after: func(t *testing.T) {
 				//绕开你的代码去数据库去验正,因为有可能你的代码都是错误的
-				var art dao.Article
+				var art article.Article
 				err := s.db.Where("id=?", 1).First(&art).Error
 				assert.NoError(t, err)
 				assert.True(t, art.Ctime > 0)
 				assert.True(t, art.Utime > 0)
 				art.Ctime = 0
 				art.Utime = 0
-				assert.Equal(t, dao.Article{
+				assert.Equal(t, article.Article{
 					Id:       1,
 					Title:    "我的标题",
 					Content:  "我的内容",
@@ -95,7 +95,7 @@ func (s *ArticleTestSuite) TestEdit() {
 			name: "修改已有帖子,并保存下来",
 			before: func(t *testing.T) {
 				//假设数据库已经有数据了，实际的输出
-				err := s.db.Create(dao.Article{
+				err := s.db.Create(article.Article{
 					Id:       2,
 					Title:    "我的标题",
 					Content:  "我的内容",
@@ -109,7 +109,7 @@ func (s *ArticleTestSuite) TestEdit() {
 			},
 			after: func(t *testing.T) {
 				//绕开你的代码去数据库去验正,因为有可能你的代码都是错误的
-				var art dao.Article
+				var art article.Article
 				err := s.db.Where("id=?", 2).First(&art).Error
 				assert.NoError(t, err)
 
@@ -117,7 +117,7 @@ func (s *ArticleTestSuite) TestEdit() {
 				//art.Ctime = 0如果你不设置 art.Utime = 0，断言时会比较 Utime，而因为它的动态更新特性
 				art.Utime = 0
 				//这个是数据库中查询出来的数据，相当于模拟数据库，预期的输出
-				assert.Equal(t, dao.Article{
+				assert.Equal(t, article.Article{
 					Id:       2,
 					Title:    "新的标题",
 					Content:  "新的内容",
@@ -142,7 +142,7 @@ func (s *ArticleTestSuite) TestEdit() {
 			name: "修改别人的帖子id",
 			before: func(t *testing.T) {
 				//假设数据库已经有数据了，实际的输出
-				err := s.db.Create(dao.Article{
+				err := s.db.Create(article.Article{
 					Id:      3,
 					Title:   "我的标题",
 					Content: "我的内容",
@@ -157,12 +157,12 @@ func (s *ArticleTestSuite) TestEdit() {
 			},
 			after: func(t *testing.T) {
 				//去数据库去验正,因为有可能你的代码都是错误的
-				var art dao.Article
+				var art article.Article
 				err := s.db.Where("id=?", 3).First(&art).Error
 				assert.NoError(t, err)
 
 				//这个是数据库中查询出来的数据，相当于模拟数据库，预期的输出
-				assert.Equal(t, dao.Article{
+				assert.Equal(t, article.Article{
 					Id:       3,
 					Title:    "我的标题",
 					Content:  "我的内容",

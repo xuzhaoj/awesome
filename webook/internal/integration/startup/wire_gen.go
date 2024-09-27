@@ -11,6 +11,7 @@ import (
 	"awesomeProject/webook/internal/repository/article"
 	"awesomeProject/webook/internal/repository/cache"
 	"awesomeProject/webook/internal/repository/dao"
+	article2 "awesomeProject/webook/internal/repository/dao/article"
 	"awesomeProject/webook/internal/service"
 	"awesomeProject/webook/internal/web"
 	"awesomeProject/webook/ioc"
@@ -34,7 +35,7 @@ func InitWebServer() *gin.Engine {
 	smsService := ioc.InitSMSService()
 	codeService := service.NewCodeService(codeRepository, smsService)
 	userHandler := web.NewUserHandler(userService, codeService)
-	articleDao := dao.NewGORMArticleDao(db)
+	articleDao := article2.NewGORMArticleDao(db)
 	articleRepository := article.NewArticleRepository(articleDao)
 	articleService := service.NewArticleService(articleRepository)
 	articleHandler := web.NewArticleHandler(articleService, loggerV1)
@@ -45,7 +46,7 @@ func InitWebServer() *gin.Engine {
 // 不需要注入那么多的东西所以直接
 func InitArticleHandler() *web.ArticleHandler {
 	db := InitDB()
-	articleDao := dao.NewGORMArticleDao(db)
+	articleDao := article2.NewGORMArticleDao(db)
 	articleRepository := article.NewArticleRepository(articleDao)
 	articleService := service.NewArticleService(articleRepository)
 	loggerV1 := InitLogger()

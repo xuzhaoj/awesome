@@ -1,9 +1,10 @@
-package dao
+package article
 
 import (
 	"context"
 	"fmt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"time"
 )
 
@@ -11,6 +12,8 @@ import (
 type ArticleDao interface {
 	Insert(ctx context.Context, art Article) (int64, error)
 	UpdateById(ctx context.Context, article Article) error
+	Sync(ctx context.Context, article Article) (int64, error)
+	Upsert(ctx context.Context, art PublishArticle) error
 }
 
 func NewGORMArticleDao(db *gorm.DB) ArticleDao {
@@ -21,6 +24,52 @@ func NewGORMArticleDao(db *gorm.DB) ArticleDao {
 
 type GORMArticleDao struct {
 	db *gorm.DB
+}
+
+func (dao *GORMArticleDao) Sync(ctx context.Context, art Article) (int64, error) {
+	var (
+		id = art.Id
+	)
+	//事务的内部开启了闭包的形态   tx是Transaction
+	err := dao.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		txDAO := NewGORMArticleDao(tx)
+		//判断执行的是新建还是更新
+		if id > 0 {
+			err = txDAO.UpdateById(ctx, art)
+
+		} else {
+			id, err = txDAO.Insert(ctx, art)
+		}
+		if err != nil {
+			//两个数据库中有一个出错了
+			return err
+		}
+		art.Id = id
+		//往reader数据库中去写入数
+		return txDAO.Upsert(ctx, PublishArticle{Article: art})
+
+	})
+	return id, err
+}
+
+// 插入新记录更新现有记录：如果插入时发生了主键或唯一索引冲突执行更新操作，只更新指定的字段，而不会插入新的记录。
+func (dao *GORMArticleDao) Upsert(ctx context.Context, art PublishArticle) error {
+	now := time.Now().UnixMilli()
+	art.Ctime = now
+	art.Utime = now
+	//这个是插入，不支持带where的写法这个就是upsert的局限性
+	err := dao.db.Clauses(clause.OnConflict{
+		//只会更新内容
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"title":   art.Title,
+			"content": art.Content,
+			"utime":   now,
+		}),
+	}).Create(&art).Error
+	//如果有数据冲突就执行对应xxx
+	//MYSQL最终的语句INSERT xxx on DUPICATE KEY UPDATE xxx
+	return err
 }
 
 // 制作库
@@ -42,6 +91,7 @@ func (dao *GORMArticleDao) Insert(ctx context.Context, art Article) (int64, erro
 	art.Utime = now
 	err := dao.db.WithContext(ctx).Create(&art).Error
 	//返回插入生成的id
+	//GORM 会将数据库生成的字段值自动填充到 art 结构体的相关字段中
 	return art.Id, err
 }
 

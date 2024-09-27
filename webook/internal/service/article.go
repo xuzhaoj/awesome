@@ -25,15 +25,14 @@ type articleService struct {
 	l      logger.LoggerV1
 }
 
-// 制作库的操作功能
+// 控制一个aythrepo库实现两者之间的发布
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
-	//TODO implement me
-	panic("implement me")
+	return a.repo.SyncV1(ctx, art)
 }
 
-// 线上库的操作功能
+// 线上库的操作功能,通过art和read rep同时实现线上库和制作库的同步
 func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int64, error) {
-
+	//就算新建art是0，，，更新art也是0进行同时的id插入
 	var (
 		id  = art.Id
 		err error
