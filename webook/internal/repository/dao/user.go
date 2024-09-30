@@ -83,9 +83,9 @@ type User struct {
 	//如果不提供则返回null而不是""
 	Email    sql.NullString `gorm:"unique"`
 	Password string
+	NickName string
 	//如果不提供则返回null而不是"",定义唯一索引的时候才需要这样
 	Phone sql.NullString `gorm:"unique"`
 	Ctime int64
-
 	Utime int64
 }

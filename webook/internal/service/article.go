@@ -11,8 +11,15 @@ import (
 type ArticleService interface {
 	//就是一个创建的服务
 	Save(ctx context.Context, art domain.Article) (int64, error)
+	//通过状态码实现对文章状态的更新，同步线上库和线下库，也就是实现了保存到草稿箱，然后发布
 	Publish(ctx context.Context, art domain.Article) (int64, error)
 	PublishV1(ctx context.Context, art domain.Article) (int64, error)
+	Withdraw(ctx context.Context, art domain.Article) error
+	//查询文章数组接口
+	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
+	//根据文章帖子id查询文章信息
+	GetById(ctx context.Context, id int64) (domain.Article, error)
+	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
 }
 
 type articleService struct {
@@ -25,9 +32,32 @@ type articleService struct {
 	l      logger.LoggerV1
 }
 
-// 控制一个aythrepo库实现两者之间的发布
+// 查询文章，组合文章和作者的信息
+func (a *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
+	return a.repo.GetPublishedById(ctx, id)
+}
+
+func (a *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
+
+	return a.repo.GetById(ctx, id)
+}
+
+func (a *articleService) List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
+	//TODO implement me
+	return a.repo.List(ctx, uid, offset, limit)
+}
+
+// 传递给repo的时候就不需要把结构体往下面传递你只需要传递一些值就可以了
+func (a *articleService) Withdraw(ctx context.Context, art domain.Article) error {
+	return a.repo.SyncStatus(ctx, art.Id, art.Author.Id, domain.ArticleStatusPrivate.ToUint8())
+}
+
+// 控制一个aythrepo库实现两者之间的发布，
 func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
-	return a.repo.SyncV1(ctx, art)
+	//web的req是变量，我这里直接赋值常量就没事了，进来这个逻辑后手动的赋值状态码
+	art.Status = domain.ArticleStatusPublished
+	//return a.repo.SyncV1(ctx, art)
+	return a.repo.Sync(ctx, art)
 }
 
 // 线上库的操作功能,通过art和read rep同时实现线上库和制作库的同步
@@ -86,6 +116,7 @@ func NewArticleServiceV1(author article.ArticleAuthorRepository, reader article.
 	}
 }
 func (a *articleService) Save(ctx context.Context, art domain.Article) (int64, error) {
+	art.Status = domain.ArticleStatusUnpublished
 	//判断是新增还是修改
 	if art.Id > 0 {
 		//是修改

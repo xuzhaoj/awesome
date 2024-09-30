@@ -13,7 +13,12 @@ type ArticleDao interface {
 	Insert(ctx context.Context, art Article) (int64, error)
 	UpdateById(ctx context.Context, article Article) error
 	Sync(ctx context.Context, article Article) (int64, error)
-	Upsert(ctx context.Context, art PublishArticle) error
+	Upsert(ctx context.Context, art PublishedArticle) error
+	SyncStatus(ctx context.Context, id int64, author int64, status uint8) error
+	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error)
+	//根据id查询文章
+	GetById(ctx context.Context, id int64) (Article, error)
+	GetPubById(ctx context.Context, id int64) (PublishedArticle, error)
 }
 
 func NewGORMArticleDao(db *gorm.DB) ArticleDao {
@@ -26,8 +31,66 @@ type GORMArticleDao struct {
 	db *gorm.DB
 }
 
+func (dao *GORMArticleDao) GetPubById(ctx context.Context, id int64) (PublishedArticle, error) {
+	var res PublishedArticle
+	err := dao.db.WithContext(ctx).
+		Where("id = ?", id).
+		First(&res).Error
+	return res, err
+}
+
+// 根据id查找文章信息
+func (dao *GORMArticleDao) GetById(ctx context.Context, id int64) (Article, error) {
+	var art Article
+	err := dao.db.WithContext(ctx).
+		Model(&Article{}).
+		Where("id=?", id).
+		First(&art).Error
+	return art, err
+}
+
+func (dao *GORMArticleDao) GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error) {
+	var arts []Article
+	//Model就是制定要查询的数据库表，，，
+	err := dao.db.WithContext(ctx).Model(&Article{}).
+		Where("author_id = ?", uid).
+		Offset(offset).
+		Limit(limit).
+		Order("utime DESC").
+		//用于存储查询结果的变量，填充到arts中
+		Find(&arts).Error
+	//返回到repo层进行数据转化处理
+	return arts, err
+}
+
+func (dao *GORMArticleDao) SyncStatus(ctx context.Context, id int64, author int64, status uint8) error {
+	now := time.Now().UnixMilli()
+	//制作库和线上库的状态都改掉，开启事务
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Model(&Article{}).Where("id=? AND author_id=?", id, author).Updates(map[string]any{
+			"status": status,
+			"utime":  now,
+		})
+		if res.Error != nil {
+			//数据库有问题
+			return res.Error
+		}
+		if res.RowsAffected != 1 {
+			//id和作者的id同时有一个是错的导致更新不了状态
+			return fmt.Errorf("可能有人在搞你,误操作非自己的文章 uid: %d, aid: %d", author, id)
+		}
+		//同时更新线上库的状态变成不可见
+		return tx.Model(&PublishedArticle{}).Where("id=?", id).Updates(map[string]any{
+			"status": status,
+			"utime":  now,
+		}).Error
+
+	})
+}
+
 func (dao *GORMArticleDao) Sync(ctx context.Context, art Article) (int64, error) {
 	var (
+		//使用id进行判断是修改还是新建，反正不管怎样最后都是要往两个库中插入数据
 		id = art.Id
 	)
 	//事务的内部开启了闭包的形态   tx是Transaction
@@ -46,15 +109,15 @@ func (dao *GORMArticleDao) Sync(ctx context.Context, art Article) (int64, error)
 			return err
 		}
 		art.Id = id
-		//往reader数据库中去写入数
-		return txDAO.Upsert(ctx, PublishArticle{Article: art})
+		//往reader数据库中去写入出版的文章数据
+		return txDAO.Upsert(ctx, PublishedArticle{Article: art})
 
 	})
 	return id, err
 }
 
-// 插入新记录更新现有记录：如果插入时发生了主键或唯一索引冲突执行更新操作，只更新指定的字段，而不会插入新的记录。
-func (dao *GORMArticleDao) Upsert(ctx context.Context, art PublishArticle) error {
+// 插入新记录或者更新现有记录：如果插入时发生了主键或唯一索引冲突执行更新操作，只更新指定的字段，而不会插入新的记录。
+func (dao *GORMArticleDao) Upsert(ctx context.Context, art PublishedArticle) error {
 	now := time.Now().UnixMilli()
 	art.Ctime = now
 	art.Utime = now
@@ -64,6 +127,7 @@ func (dao *GORMArticleDao) Upsert(ctx context.Context, art PublishArticle) error
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			"title":   art.Title,
 			"content": art.Content,
+			"status":  art.Status,
 			"utime":   now,
 		}),
 	}).Create(&art).Error
@@ -81,6 +145,7 @@ type Article struct {
 	//AuthorId int64 `gorm:"index=aid_ctime"`
 	//Ctime    int64 `gorm:"index=aid_ctime"`
 	AuthorId int64 `gorm:"index"`
+	Status   uint8
 	Ctime    int64
 	Utime    int64
 }
@@ -129,6 +194,7 @@ func (dao *GORMArticleDao) UpdateById(ctx context.Context, art Article) error {
 		Updates(map[string]any{
 			"title":   art.Title,
 			"content": art.Content,
+			"status":  art.Status,
 			"utime":   now,
 		})
 
