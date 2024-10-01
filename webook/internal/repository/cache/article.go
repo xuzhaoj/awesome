@@ -23,6 +23,7 @@ type RedisArticleCache struct {
 	client redis.Cmdable
 }
 
+// 单个的文章详情进行缓存
 func (r *RedisArticleCache) SetPub(ctx context.Context, art domain.Article) error {
 	//这种存一个文章的随便看啊
 	val, err := json.Marshal(art)
@@ -31,6 +32,8 @@ func (r *RedisArticleCache) SetPub(ctx context.Context, art domain.Article) erro
 	}
 	return r.client.Set(ctx, r.pubKey(art.Id), val, time.Minute*10).Err()
 }
+
+// 查询文章详情进行缓存
 func (r *RedisArticleCache) GetPub(ctx context.Context, id int64) (domain.Article, error) {
 	val, err := r.client.Get(ctx, r.pubKey(id)).Bytes()
 	if err != nil {

@@ -16,12 +16,16 @@ var _ Handler = (*ArticleHandler)(nil)
 type ArticleHandler struct {
 	svc service.ArticleService
 	l   logger.LoggerV1
+	//阅读数量、点赞、评论
+	intrSvc service.InteractiveService
+	biz     string
 }
 
 func NewArticleHandler(svc service.ArticleService, l logger.LoggerV1) *ArticleHandler {
 	return &ArticleHandler{
 		svc: svc,
 		l:   l,
+		biz: "article",
 	}
 }
 func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
@@ -35,9 +39,10 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	//作者查看文章详情的接口
 	g.GET("/detail/:id", h.Detail)
 
-	//读者查看文章线上库
+	//读者查看文章线上库--------可以同时具有阅读次数的显示
 	pub := g.Group("/pub")
 	pub.GET("/:id", h.PubDetail)
+	pub.POST("/like", h.Like)
 }
 
 func (h *ArticleHandler) Detail(ctx *gin.Context) {
@@ -295,6 +300,7 @@ func (h *ArticleHandler) Edit(ctx *gin.Context) {
 	})
 }
 
+// 获取文章详情信息，
 func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 	idstr := ctx.Param("id")
 	//字符串转整数
@@ -309,6 +315,7 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
+	//查询出来文章了
 	art, err := h.svc.GetPublishedById(ctx, id)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
@@ -318,62 +325,16 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		h.l.Error("获得文章的信息失败", logger.Error(err))
 		return
 	}
-
-	//var (
-	//	eg   errgroup.Group
-	//	art  domain.Article
-	//	intr domain.Interactive
-	//)
-	//
-	//eg.Go(func() error {
-	//	var er error
-	//	art, er = h.svc.GetPublishedById(ctx, id)
-	//	return er
-	//})
-	//获取用户登录的id
-	c := ctx.MustGet("claims")
-	claims, ok := c.(*UserClaims)
-	if !ok {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
-		})
-		h.l.Error("未发现用户的session")
-		return
-	}
-	//uc := ctx.MustGet("user").(jwt.UserClaims)
-	//eg.Go(func() error {
-	//	var er error
-	//	intr, er = h.intrSvc.Get(ctx, h.biz, id, claims.Uid)
-	//	return er
-	//})
-	//
-	//// 等待结果
-	//err = eg.Wait()
-	//if err != nil {
-	//	ctx.JSON(http.StatusOK, Result{
-	//		Msg:  "系统错误",
-	//		Code: 5,
-	//	})
-	//	h.l.Error("查询文章失败，系统错误",
-	//		logger.Int64("aid", id),
-	//		logger.Int64("uid", claims.Uid),
-	//		logger.Error(err))
-	//	return
-	//}
-	//
-	//go func() {
-	//	// 1. 如果你想摆脱原本主链路的超时控制，你就创建一个新的
-	//	// 2. 如果你不想，你就用 ctx
-	//	newCtx, cancel := ctx.WithTimeout(ctx.Background(), time.Second)
-	//	defer cancel()
-	//	er := h.intrSvc.IncrReadCnt(newCtx, h.biz, art.Id)
-	//	if er != nil {
-	//		h.l.Error("更新阅读数失败",
-	//			logger.Int64("aid", art.Id),
-	//			logger.Error(err))
-	//	}
-	//}()
+	//反正你获取好文章后再开异步
+	go func() {
+		//增加阅读计数,开一个goroutine异步去执行就行了
+		er := h.intrSvc.IncrReadCnt(ctx, h.biz, art.Id)
+		if er != nil {
+			h.l.Error("增加阅读计数失败",
+				logger.Int64("aid", art.Id),
+				logger.Error(er))
+		}
+	}()
 
 	ctx.JSON(http.StatusOK, Result{
 		Data: ArticleVO{
@@ -393,6 +354,46 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			Ctime: art.Ctime.Format(time.DateTime),
 			Utime: art.Utime.Format(time.DateTime),
 		},
+	})
+}
+
+// 点赞,取消点赞同时复用接口的实现
+func (h *ArticleHandler) Like(ctx *gin.Context) {
+	type LikeReq struct {
+		//代表文章的id
+		Id   int64 `json:"id"`
+		Like bool  `json:"like"`
+	}
+	var req LikeReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	//获取用户登录的id
+	c := ctx.MustGet("claims")
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("未发现用户的session")
+		return
+	}
+	var err error
+	if req.Like {
+		//"Article,文章id,用户id"
+		err = h.intrSvc.Like(ctx, h.biz, req.Id, claims.Uid)
+	} else {
+		err = h.intrSvc.CancelLike(ctx, h.biz, req.Id, claims.Uid)
+	}
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "OK",
 	})
 }
 
