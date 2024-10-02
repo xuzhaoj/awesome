@@ -2,6 +2,7 @@ package service
 
 import (
 	"awesomeProject/webook/internal/domain"
+	events "awesomeProject/webook/internal/events/article"
 	"awesomeProject/webook/internal/repository/article"
 	"awesomeProject/webook/pkg/logger"
 	"context"
@@ -19,7 +20,7 @@ type ArticleService interface {
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 	//根据文章帖子id查询文章信息
 	GetById(ctx context.Context, id int64) (domain.Article, error)
-	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
+	GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error)
 }
 
 type articleService struct {
@@ -30,11 +31,28 @@ type articleService struct {
 	author article.ArticleAuthorRepository
 	reader article.ArticleReaderRepository
 	l      logger.LoggerV1
+	//来一个生产者
+	producer events.Producer
 }
 
 // 查询文章，组合文章和作者的信息
-func (a *articleService) GetPublishedById(ctx context.Context, id int64) (domain.Article, error) {
-	return a.repo.GetPublishedById(ctx, id)
+func (a *articleService) GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error) {
+	art, err := a.repo.GetPublishedById(ctx, id)
+	//成功的查询出来文章的信息
+	if err == nil {
+		go func() {
+			er := a.producer.ProduceReadEvent(
+				ctx,
+				events.ReadEvent{
+					Uid: uid,
+					Aid: id,
+				})
+			if er != nil {
+				a.l.Error("发送读者阅读事件失败")
+			}
+		}()
+	}
+	return art, err
 }
 
 func (a *articleService) GetById(ctx context.Context, id int64) (domain.Article, error) {
@@ -103,9 +121,11 @@ func (a *articleService) PublishV1(ctx context.Context, art domain.Article) (int
 	return id, err
 }
 
-func NewArticleService(repo article.ArticleRepository) ArticleService {
+func NewArticleService(repo article.ArticleRepository, l logger.LoggerV1, producer events.Producer) ArticleService {
 	return &articleService{
-		repo: repo,
+		repo:     repo,
+		l:        l,
+		producer: producer,
 	}
 }
 func NewArticleServiceV1(author article.ArticleAuthorRepository, reader article.ArticleReaderRepository, l logger.LoggerV1) ArticleService {

@@ -3,9 +3,7 @@ package main
 import (
 	"errors"
 	"github.com/spf13/viper"
-	"net/http"
-	//Gin框架API
-	"github.com/gin-gonic/gin"
+
 	"go.uber.org/zap"
 )
 
@@ -14,7 +12,7 @@ func main() {
 	//
 	initViper()
 	initLogger()
-	server := InitWebServer()
+	//server := InitWebServer()
 	//
 	//rdb := initRedis()
 	//
@@ -24,10 +22,10 @@ func main() {
 
 	//server := InitWebServer()
 	//server := gin.Default()
-	server.GET("/hello", func(context *gin.Context) {
-		context.String(http.StatusOK, "hello world")
-	})
-	server.Run(":8080")
+	//server.GET("/hello", func(context *gin.Context) {
+	//	context.String(http.StatusOK, "hello world")
+	//})
+	//server.Run(":8080")
 }
 func InitWebServer1() {
 

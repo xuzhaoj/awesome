@@ -20,6 +20,7 @@ type UserLikeBiz struct {
 	Ctime  int64
 }
 
+// 收藏夹，记录了用户收藏了文章记录，收藏数并不在这个表中逻辑就是这样
 type UserCollectionBiz struct {
 	Id int64 `gorm:"primaryKey,autoIncrement"`
 	// 这边还是保留了了唯一索引
@@ -27,7 +28,7 @@ type UserCollectionBiz struct {
 	BizId int64  `gorm:"uniqueIndex:uid_biz_type_id"`
 	Biz   string `gorm:"type:varchar(128);uniqueIndex:uid_biz_type_id"`
 	// 收藏夹的ID
-	// 收藏夹ID本身有索引
+	//收藏夹的id 其实就是默认收藏夹、后端开发收藏夹，前端开发收藏夹  前端会返回对应的id
 	Cid   int64 `gorm:"index"`
 	Utime int64
 	Ctime int64
@@ -45,7 +46,7 @@ type InteractiveV1 struct {
 	Ctime   int64
 }
 
-// 用来记录文章总的点赞数和阅读数和收藏数
+// 用来记录文章总的点赞数和阅读数和收藏数，，，，，，，记录文章总的点赞收藏阅读计数
 type Interactive struct {
 	Id int64 `gorm:"primaryKey,autoIncrement"`
 	//业务标识符号//创建联合索引，第一个条件查询最左前追的原则，第二个条件区分度，排序。，
@@ -60,6 +61,9 @@ type Interactive struct {
 	Utime      int64
 	Ctime      int64
 }
+
+var ErrRecordNotFound = gorm.ErrRecordNotFound
+
 type InteractiveDAO interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
 	BatchIncrReadCnt(ctx context.Context, bizs []string, bizIds []int64) error
@@ -84,7 +88,7 @@ func (dao *GORMInteractiveDAO) IncrReadCnt(ctx context.Context, biz string, bizI
 	now := time.Now().UnixMilli()
 	//要执行upset语句，你不可以先执行查询后在更新数值,这样会有并发问题不安全
 	//但是你在查询的时候有考虑一个问题数据库有没数据，此时应该要有upsert语义
-	return dao.db.Clauses(clause.OnConflict{
+	return dao.db.WithContext(ctx).Clauses(clause.OnConflict{
 		//尝试插入一条记录的时候主键或者唯一键进行冲突---primarykey和unique两者冲突
 		DoUpdates: clause.Assignments(map[string]any{
 			//遇到冲突的时候更新下面的字段，自增1
@@ -169,24 +173,55 @@ func (dao *GORMInteractiveDAO) DeleteLikeInfo(ctx context.Context, biz string, b
 	})
 }
 
+// 插入收藏记录并且更新计数
 func (dao *GORMInteractiveDAO) InsertCollectionBiz(ctx context.Context, cb UserCollectionBiz) error {
-	//TODO implement me
-	panic("implement me")
+	now := time.Now().UnixMilli()
+
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Create(&cb).Error
+		if err != nil {
+			return err
+		}
+
+		//upset语义
+		return tx.WithContext(ctx).Clauses(clause.OnConflict{
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"collect_cnt": gorm.Expr("`collect_cnt` + 1"),
+				"utime":       now,
+			}),
+		}).Create(&Interactive{
+			Biz:        cb.Biz,
+			BizId:      cb.BizId,
+			CollectCnt: 1,
+			Ctime:      now,
+			Utime:      now,
+		}).Error
+	})
 }
 
+// 得到数据库中存储点赞表的数据库字段的第一条记录
 func (dao *GORMInteractiveDAO) GetLikeInfo(ctx context.Context, biz string, id int64, uid int64) (UserLikeBiz, error) {
-	//TODO implement me
-	panic("implement me")
+	var res UserLikeBiz
+	err := dao.db.WithContext(ctx).
+		Where("biz=? AND biz_id=? AND uid=? AND status=? ",
+			biz, id, uid, 1).First(&res).Error
+	return res, err
 }
 
+// 得到数据库中存储收藏表的数据库字段的第一条记录
 func (dao *GORMInteractiveDAO) GetCollectInfo(ctx context.Context, biz string, id int64, uid int64) (UserCollectionBiz, error) {
-	//TODO implement me
-	panic("implement me")
+	var res UserCollectionBiz
+	err := dao.db.WithContext(ctx).
+		Where("biz=? AND biz_id=? AND uid=?", biz, id, uid).First(&res).Error
+	return res, err
 }
 
+// 缓存失败直接      从数据库中查询出来交互表中对应文章的点赞收藏评论数量
 func (dao *GORMInteractiveDAO) Get(ctx context.Context, biz string, id int64) (Interactive, error) {
-	//TODO implement me
-	panic("implement me")
+	var res Interactive
+	err := dao.db.WithContext(ctx).
+		Where("biz=? AND biz_id=?", biz, id).First(&res).Error
+	return res, err
 }
 
 func NewGORMInteractiveDAO(db *gorm.DB) InteractiveDAO {

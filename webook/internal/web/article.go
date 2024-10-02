@@ -6,6 +6,7 @@ import (
 	"awesomeProject/webook/pkg/logger"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 	"net/http"
 	"strconv"
 	"time"
@@ -21,11 +22,12 @@ type ArticleHandler struct {
 	biz     string
 }
 
-func NewArticleHandler(svc service.ArticleService, l logger.LoggerV1) *ArticleHandler {
+func NewArticleHandler(svc service.ArticleService, l logger.LoggerV1, intrSvc service.InteractiveService) *ArticleHandler {
 	return &ArticleHandler{
-		svc: svc,
-		l:   l,
-		biz: "article",
+		svc:     svc,
+		l:       l,
+		intrSvc: intrSvc,
+		biz:     "article",
 	}
 }
 func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
@@ -43,6 +45,7 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	pub := g.Group("/pub")
 	pub.GET("/:id", h.PubDetail)
 	pub.POST("/like", h.Like)
+	pub.POST("/collect", h.Collect)
 }
 
 func (h *ArticleHandler) Detail(ctx *gin.Context) {
@@ -300,7 +303,7 @@ func (h *ArticleHandler) Edit(ctx *gin.Context) {
 	})
 }
 
-// 获取文章详情信息，
+// 获取单篇文章的详情信息，
 func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 	idstr := ctx.Param("id")
 	//字符串转整数
@@ -315,18 +318,62 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-	//查询出来文章了
-	art, err := h.svc.GetPublishedById(ctx, id)
+
+	var eg errgroup.Group
+	var art domain.Article
+	//获取用户登录的id
+	c := ctx.MustGet("claims")
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("未发现用户的session")
+		return
+	}
+	//查询出来文章信息了.异步去执行
+	eg.Go(func() error {
+		art, err = h.svc.GetPublishedById(ctx, id, claims.Uid)
+		return err
+		//if err != nil {
+		//	ctx.JSON(http.StatusOK, Result{
+		//		Code: 5,
+		//		Msg:  "系统错误",
+		//	})
+		//	h.l.Error("获得文章的信息失败", logger.Error(err))
+		//	return
+		//}
+	})
+
+	//***********88888888888888*****要在这里获取文章的阅读收藏和点赞******************************
+	var intr domain.Interactive
+	eg.Go(func() error {
+
+		//查询所有的点赞收藏还有阅读
+		intr, err = h.intrSvc.Get(ctx, h.biz, id, claims.Uid)
+		//容忍错误的写法
+		//if err!=nil{
+		//	//记录日志
+		//}
+		//return nil
+		return err
+
+	})
+
+	//要等前面两个结束后才可以开启下面的
+	err = eg.Wait()
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
-		h.l.Error("获得文章的信息失败", logger.Error(err))
 		return
 	}
-	//反正你获取好文章后再开异步
+
+	//***********************************************************反正你获取好文章后再开异步
 	go func() {
+		//导致数据库压力大
 		//增加阅读计数,开一个goroutine异步去执行就行了
 		er := h.intrSvc.IncrReadCnt(ctx, h.biz, art.Id)
 		if er != nil {
@@ -338,21 +385,20 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, Result{
 		Data: ArticleVO{
-			Id:    art.Id,
-			Title: art.Title,
-
+			Id:      art.Id,
+			Title:   art.Title,
 			Content: art.Content,
 			Status:  art.Status.ToUint8(),
 			//Author:   art.Author.Id,
 			//要把作者信息带上
-			Author: art.Author.Name,
-			//ReadCnt:    intr.ReadCnt,
-			//CollectCnt: intr.CollectCnt,
-			//LikeCnt:    intr.LikeCnt,
-			//Liked:      intr.Liked,
-			//Collected:  intr.Collected,
-			Ctime: art.Ctime.Format(time.DateTime),
-			Utime: art.Utime.Format(time.DateTime),
+			Author:     art.Author.Name,
+			ReadCnt:    intr.ReadCnt,
+			CollectCnt: intr.CollectCnt,
+			LikeCnt:    intr.LikeCnt,
+			Liked:      intr.Liked,
+			Collected:  intr.Collected,
+			Ctime:      art.Ctime.Format(time.DateTime),
+			Utime:      art.Utime.Format(time.DateTime),
 		},
 	})
 }
@@ -395,6 +441,47 @@ func (h *ArticleHandler) Like(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "OK",
 	})
+}
+
+// 收藏进收藏夹的功能
+func (h *ArticleHandler) Collect(ctx *gin.Context) {
+	type Req struct {
+		Id int64 `json:"id"`
+		//前端传递收藏夹的id比如说后端开发收藏夹的id为1,前端开发的收藏夹为2这样
+		Cid int64 `json:"cid"`
+	}
+	var req Req
+	//把前端的数据绑定到结构体上
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	//获取用户登录的id
+	c := ctx.MustGet("claims")
+	claims, ok := c.(*UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		h.l.Error("未发现用户的session")
+		return
+	}
+	//进行收藏的功能，就不需要返回什么了把
+	err := h.intrSvc.Collect(ctx, h.biz, req.Id, req.Cid, claims.Uid)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5, Msg: "系统错误",
+		})
+		h.l.Error("收藏失败",
+			logger.Error(err),
+			logger.Int64("uid", claims.Uid),
+			logger.Int64("aid", req.Id))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "OK",
+	})
+
 }
 
 //func (h *ArticleHandler) Like(c *gin.Context) {

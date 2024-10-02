@@ -4,3 +4,8 @@ db.mysql:
 
 redis:
   addr: "localhost:6379"
+
+
+kafka:
+  addrs:
+    - "localhost:9094"
