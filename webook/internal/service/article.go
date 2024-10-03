@@ -35,6 +35,7 @@ type articleService struct {
 	producer events.Producer
 }
 
+// 你查询你的文章信息我一个异步去增加阅读次数
 // 查询文章，组合文章和作者的信息
 func (a *articleService) GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error) {
 	art, err := a.repo.GetPublishedById(ctx, id)

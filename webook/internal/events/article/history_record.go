@@ -10,7 +10,7 @@ import (
 )
 
 // 实现了对文章的 阅读计数
-type InteractiveReadEventConsumer struct {
+type HistoryReadEventConsumer struct {
 	//客户端用于连接kafka集群
 	client sarama.Client
 	//业务代码
@@ -18,10 +18,10 @@ type InteractiveReadEventConsumer struct {
 	l    logger.LoggerV1
 }
 
-func NewInteractiveReadEventConsumer(
+func NewHistoryReadEventConsumer(
 	client sarama.Client,
-	l logger.LoggerV1, repo repository.InteractiveRepository) *InteractiveReadEventConsumer {
-	return &InteractiveReadEventConsumer{
+	l logger.LoggerV1, repo repository.InteractiveRepository) *HistoryReadEventConsumer {
+	return &HistoryReadEventConsumer{
 		client: client,
 		repo:   repo,
 		l:      l,
@@ -29,7 +29,7 @@ func NewInteractiveReadEventConsumer(
 }
 
 // 启动kafka消费者监听articleredad主题，开始消费信息
-func (r *InteractiveReadEventConsumer) Start() error {
+func (r *HistoryReadEventConsumer) Start() error {
 	//创建消费者组，组名是interactive
 	cg, err := sarama.NewConsumerGroupFromClient("interactive", r.client)
 	if err != nil {
@@ -50,9 +50,9 @@ func (r *InteractiveReadEventConsumer) Start() error {
 	return err
 }
 
-func (r *InteractiveReadEventConsumer) Consume(msg *sarama.ConsumerMessage, t ReadEvent) error {
+func (r *HistoryReadEventConsumer) Consume(msg *sarama.ConsumerMessage, t ReadEvent) error {
 	//设置超时时间和关闭通道
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	return r.repo.IncrReadCnt(ctx, "article", t.Aid)
+	return r.repo.AddRecord(ctx, t.Aid, t.Uid)
 }

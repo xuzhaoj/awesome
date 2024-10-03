@@ -34,6 +34,11 @@ func NewSyncProducer(client sarama.Client) sarama.SyncProducer {
 }
 
 // NewConsumers 面临的问题依旧是所有的 Consumer 在这里注册一下
-func NewConsumers(c1 *article.InteractiveReadEventConsumer) []events.Consumer {
+//func NewConsumers(c1 *article.InteractiveReadEventConsumer) []events.Consumer {
+//	return []events.Consumer{c1}
+//}
+
+// 改成批量消费的
+func NewConsumers(c1 *article.InteractiveReadEventBatchConsumer) []events.Consumer {
 	return []events.Consumer{c1}
 }

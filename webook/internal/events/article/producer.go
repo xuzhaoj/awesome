@@ -12,8 +12,8 @@ type Producer interface {
 
 // *****************************************领域事件只需要传递用户id和文章id就可以
 type ReadEvent struct {
-	Uid int64
-	Aid int64
+	Uid int64 `json:"uid"`
+	Aid int64 `json:"aid"`
 }
 
 type KafkaProducer struct {

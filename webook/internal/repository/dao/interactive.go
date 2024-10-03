@@ -105,9 +105,23 @@ func (dao *GORMInteractiveDAO) IncrReadCnt(ctx context.Context, biz string, bizI
 	}).Error
 }
 
+// 实现批量消费者增加阅读计数的逻辑
 func (dao *GORMInteractiveDAO) BatchIncrReadCnt(ctx context.Context, bizs []string, bizIds []int64) error {
-	//TODO implement me
-	panic("implement me")
+	//批量的消费会提高性能
+	//biz和bizid都相等的有很多用map合并会更好
+
+	//为什么这里会快，这里只有一个事务相比你的10个事务所以会快事务本身的开销a是b的十倍刷新磁盘的10次
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txDAO := NewGORMInteractiveDAO(tx)
+		for i := range bizs {
+			//记录的都是文章数和文章id
+			err := txDAO.IncrReadCnt(ctx, bizs[i], bizIds[i])
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // 记录点赞的行为并更新点赞计数

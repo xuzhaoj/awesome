@@ -11,13 +11,15 @@ import (
 type InteractiveRepository interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
 	// BatchIncrReadCnt biz 和 bizId 长度必须一致
-	BatchIncrReadCnt(ctx context.Context, biz []string, bizId []int64) error
+	BatchIncrReadCnt(ctx context.Context,
+		bizs []string, bizId []int64) error
 	IncrLike(ctx context.Context, biz string, bizId int64, uid int64) error
 	DecrLike(ctx context.Context, biz string, bizId int64, uid int64) error
 	AddCollectionItem(ctx context.Context, biz string, bizId int64, cid int64, uid int64) error
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interactive, error)
 	Liked(ctx context.Context, biz string, id int64, uid int64) (bool, error)
 	Collected(ctx context.Context, biz string, id int64, uid int64) (bool, error)
+	AddRecord(ctx context.Context, aid int64, uid int64) error
 }
 
 // 都是接口管那么干嘛，不然就是结构体
@@ -25,6 +27,12 @@ type CacheReadCntRepository struct {
 	cache cache.InteractiveCache
 	dao   dao.InteractiveDAO
 	l     logger.LoggerV1
+}
+
+func (c *CacheReadCntRepository) AddRecord(ctx context.Context, aid int64, uid int64) error {
+
+	//TODO implement me
+	panic("implement me")
 }
 
 func NewCachedInteractiveRepository(cache cache.InteractiveCache,
@@ -45,9 +53,17 @@ func (c *CacheReadCntRepository) IncrReadCnt(ctx context.Context,
 	return c.cache.IncrReadCntIfPresent(ctx, biz, bizId)
 }
 
-func (c *CacheReadCntRepository) BatchIncrReadCnt(ctx context.Context, biz []string, bizId []int64) error {
-	//TODO implement me
-	panic("implement me")
+// 批量实现消费者增加阅读计数
+func (c *CacheReadCntRepository) BatchIncrReadCnt(ctx context.Context,
+	bizs []string, bizId []int64) error {
+	//要不要检测bizs和ids长度是否相等
+	err := c.dao.BatchIncrReadCnt(ctx, bizs, bizId)
+	if err != nil {
+		return err
+	}
+	//这里你也要批量的去修改redis,需要循环的修改lua
+	//c.cache.IncrReadCntIfPresent()
+	return nil
 }
 
 // 点赞

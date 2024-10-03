@@ -38,8 +38,9 @@ func InitWebServer() *App {
 
 		//给予内存实现对应不上
 		ioc.InitSMSService,
-		//消费者
-		article.NewInteractiveReadEventConsumer,
+		//消费者单个消费者
+		//article.NewInteractiveReadEventConsumer,
+		article.NewInteractiveReadEventBatchConsumer,
 		//article.NewKafkaProducer,
 		web.NewUserHandler,
 		web.NewArticleHandler,

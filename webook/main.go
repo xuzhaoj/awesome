@@ -2,9 +2,10 @@ package main
 
 import (
 	"errors"
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
-
 	"go.uber.org/zap"
+	"net/http"
 )
 
 func main() {
@@ -12,7 +13,18 @@ func main() {
 	//
 	initViper()
 	initLogger()
-	//server := InitWebServer()
+	app := InitWebServer()
+	server := app.web
+	//遍历数组和切片会返回每个元素的索引和元素值
+	//遍历map会返回每个键和值
+	//遍历channel会接受channel中的值直到关闭为止
+	//不需要索引值的时候可以用下划线忽略
+	for _, c := range app.consumers {
+		err := c.Start()
+		if err != nil {
+			panic(err)
+		}
+	}
 	//
 	//rdb := initRedis()
 	//
@@ -22,13 +34,11 @@ func main() {
 
 	//server := InitWebServer()
 	//server := gin.Default()
-	//server.GET("/hello", func(context *gin.Context) {
-	//	context.String(http.StatusOK, "hello world")
-	//})
-	//server.Run(":8080")
-}
-func InitWebServer1() {
-
+	//server := app.web
+	server.GET("/hello", func(context *gin.Context) {
+		context.String(http.StatusOK, "hello world")
+	})
+	server.Run(":8080")
 }
 
 //
