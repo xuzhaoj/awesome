@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=article.go -package=svcmocks -destination=mocks/article.mock.go   ArticleService
 type ArticleService interface {
 	//就是一个创建的服务
 	Save(ctx context.Context, art domain.Article) (int64, error)
@@ -21,6 +22,9 @@ type ArticleService interface {
 	//根据文章帖子id查询文章信息
 	GetById(ctx context.Context, id int64) (domain.Article, error)
 	GetPublishedById(ctx context.Context, id int64, uid int64) (domain.Article, error)
+
+	//点赞热榜的实现先拿一批数据出来,只会取start开始七天内的数据
+	ListPub(ctx context.Context, start time.Time, offset, limit int) ([]domain.Article, error)
 }
 
 type articleService struct {
@@ -33,6 +37,11 @@ type articleService struct {
 	l      logger.LoggerV1
 	//来一个生产者
 	producer events.Producer
+}
+
+func (a *articleService) ListPub(ctx context.Context, start time.Time, offset, limit int) ([]domain.Article, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 // 你查询你的文章信息我一个异步去增加阅读次数

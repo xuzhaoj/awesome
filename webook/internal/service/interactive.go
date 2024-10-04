@@ -8,6 +8,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+//go:generate mockgen -source=./interactive.go -package=svcmocks -destination=mocks/interactive.mock.go InteractiveService
 type InteractiveService interface {
 	//使用biz和bizId来标识唯一的某个特定的业务
 
@@ -17,10 +18,18 @@ type InteractiveService interface {
 	CancelLike(ctx context.Context, biz string, bizId int64, uid int64) error
 	Collect(ctx context.Context, biz string, bizId, cid, uid int64) error
 	Get(ctx context.Context, biz string, bizId int64, uid int64) (domain.Interactive, error)
+
+	//点赞热榜的实现
+	GetByIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interactive, error)
 }
 type interactiveService struct {
 	repo repository.InteractiveRepository
 	l    logger.LoggerV1
+}
+
+func (i *interactiveService) GetByIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interactive, error) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func NewInteractiveService(r repository.InteractiveRepository, l logger.LoggerV1) InteractiveService {
