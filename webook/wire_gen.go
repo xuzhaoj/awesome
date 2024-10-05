@@ -16,6 +16,7 @@ import (
 	"awesomeProject/webook/internal/service"
 	"awesomeProject/webook/internal/web"
 	"awesomeProject/webook/ioc"
+	"github.com/google/wire"
 )
 
 // Injectors from wire.go:
@@ -48,9 +49,19 @@ func InitWebServer() *App {
 	engine := ioc.InitWebServer(v, userHandler, articleHandler)
 	interactiveReadEventBatchConsumer := article3.NewInteractiveReadEventBatchConsumer(client, interactiveRepository, loggerV1)
 	v2 := ioc.NewConsumers(interactiveReadEventBatchConsumer)
+	rankingService := service.NewBatchRankingService(articleService, interactiveService)
+	rankingJob := ioc.InitRankingJob(rankingService)
+	cron := ioc.InitJobs(loggerV1, rankingJob)
 	app := &App{
 		web:       engine,
 		consumers: v2,
+		cron:      cron,
 	}
 	return app
 }
+
+// wire.go:
+
+var rankingServiceSet = wire.NewSet(repository.NewCachedRankingRepository, cache.NewRankingRedisCache, service.NewBatchRankingService)
+
+var interactiveSvcProvider = wire.NewSet(service.NewInteractiveService, repository.NewCachedInteractiveRepository, dao.NewGORMInteractiveDAO, cache.NewInteractiveRedisCache)

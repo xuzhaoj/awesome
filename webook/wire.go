@@ -15,24 +15,38 @@ import (
 	"github.com/google/wire"
 )
 
+var rankingServiceSet = wire.NewSet(
+	repository.NewCachedRankingRepository,
+	cache.NewRankingRedisCache,
+	service.NewBatchRankingService,
+)
+var interactiveSvcProvider = wire.NewSet(
+	service.NewInteractiveService,
+	repository.NewCachedInteractiveRepository,
+	dao.NewGORMInteractiveDAO,
+	cache.NewInteractiveRedisCache,
+)
+
 func InitWebServer() *App {
 	//自动生成依赖注入
 	wire.Build(ioc.InitDB, ioc.InitRedis,
 		dao.NewUserDao,
-		dao.NewGORMInteractiveDAO,
-		repository.NewCachedInteractiveRepository,
+		//dao.NewGORMInteractiveDAO,
+		//repository.NewCachedInteractiveRepository,
 		service.NewArticleService,
 		article3.NewGORMArticleDao,
 		cache.NewUserCache,
-		cache.NewInteractiveRedisCache,
+		//cache.NewInteractiveRedisCache,
 		cache.NewCodeCache,
 		repository.NewUserRepository,
 		repository.NewCodeRepository,
-
+		rankingServiceSet,
+		ioc.InitJobs,
+		ioc.InitRankingJob,
+		//service.NewInteractiveService,
 		service.NewUserService,
 		service.NewCodeService,
-		service.NewInteractiveService,
-
+		interactiveSvcProvider,
 		article2.NewArticleRepository,
 		article.NewKafkaProducer,
 

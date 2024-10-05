@@ -27,6 +27,11 @@ type interactiveService struct {
 	l    logger.LoggerV1
 }
 
+func newInteractiveService(repo repository.InteractiveRepository, l logger.LoggerV1) InteractiveService {
+	return &interactiveService{repo: repo, l: l}
+
+}
+
 func (i *interactiveService) GetByIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interactive, error) {
 	//TODO implement me
 	panic("implement me")

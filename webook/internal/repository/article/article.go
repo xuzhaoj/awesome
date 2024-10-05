@@ -27,6 +27,7 @@ type ArticleRepository interface {
 	List(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error)
 	GetById(ctx context.Context, id int64) (domain.Article, error)
 	GetPublishedById(ctx context.Context, id int64) (domain.Article, error)
+	ListPub(ctx context.Context, start time.Time, offset int, limit int) ([]domain.Article, error)
 }
 
 type CachedArticleRepository struct {
@@ -39,6 +40,18 @@ type CachedArticleRepository struct {
 	//另外一个包进行使用的时候就得包名。去调用
 	cache cache.ArticleCache
 	l     logger.LoggerV1
+}
+
+func (c *CachedArticleRepository) ListPub(ctx context.Context, start time.Time, offset int, limit int) ([]domain.Article, error) {
+	//返回的数据是文章的切片
+	res, err := c.dao.ListPub(ctx, start, offset, limit)
+	if err != nil {
+		return nil, err
+	}
+	//每个 dao.Article 转换为 domain.Article，最终返回一个 domain.Article 切片。
+	return slice.Map(res, func(idx int, src dao.Article) domain.Article {
+		return c.toDomain(src)
+	}), nil
 }
 
 func (c *CachedArticleRepository) GetPublishedById(
@@ -150,6 +163,7 @@ func (req *CachedArticleRepository) toDomain(art dao.Article) domain.Article {
 	}
 
 }
+
 func (c *CachedArticleRepository) SyncStatus(ctx context.Context, id int64, author int64, status uint8) error {
 	return c.dao.SyncStatus(ctx, id, author, uint8(status))
 }

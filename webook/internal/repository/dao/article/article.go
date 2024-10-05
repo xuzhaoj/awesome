@@ -19,6 +19,7 @@ type ArticleDao interface {
 	//根据id查询文章
 	GetById(ctx context.Context, id int64) (Article, error)
 	GetPubById(ctx context.Context, id int64) (PublishedArticle, error)
+	ListPub(ctx context.Context, start time.Time, offset int, limit int) ([]Article, error)
 }
 
 func NewGORMArticleDao(db *gorm.DB) ArticleDao {
@@ -29,6 +30,19 @@ func NewGORMArticleDao(db *gorm.DB) ArticleDao {
 
 type GORMArticleDao struct {
 	db *gorm.DB
+}
+
+// 从点赞时间最近的数据库降序排列然后我们去取数据
+func (dao *GORMArticleDao) ListPub(ctx context.Context, start time.Time, offset int, limit int) ([]Article, error) {
+	var res []Article
+	err := dao.db.WithContext(ctx).
+		//控制数据库中文章的时间更新的日期
+		Where("utime<?", start.UnixMilli()).
+		Order("utime DESC").
+		//offset表示从第几条数据开始返回，limit用来表示返回的数据个数----实现了分页的逻辑很简单的
+		Offset(offset).Limit(limit).
+		Find(&res).Error
+	return res, err
 }
 
 func (dao *GORMArticleDao) GetPubById(ctx context.Context, id int64) (PublishedArticle, error) {

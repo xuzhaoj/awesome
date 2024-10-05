@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"net/http"
+	"time"
 )
 
 func main() {
@@ -13,7 +16,9 @@ func main() {
 	//
 	initViper()
 	initLogger()
+	initPrometheus()
 	app := InitWebServer()
+	app.cron.Start()
 	server := app.web
 	//遍历数组和切片会返回每个元素的索引和元素值
 	//遍历map会返回每个键和值
@@ -39,26 +44,39 @@ func main() {
 		context.String(http.StatusOK, "hello world")
 	})
 	server.Run(":8080")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	ctx = app.cron.Stop()
+	tm := time.NewTimer(time.Minute * 10)
+	select {
+	case <-tm.C:
+	case <-ctx.Done():
+	}
 }
 
-//
-//func InitWebServer() *gin.Engine {
-//	cmdable := ioc.InitRedis()
-//	loggerV1 := ioc.InitLogger()
-//	v := ioc.InitMiddlewares(cmdable, loggerV1)
-//	db := ioc.InitDB(loggerV1)
-//	userDAO := dao.NewUserDao(db)
-//	userCache := cache.NewUserCache(cmdable)
-//	userRepository := repository.NewUserRepository(userDAO, userCache)
-//	userService := service.NewUserService(userRepository, loggerV1)
-//	codeCache := cache.NewCodeCache(cmdable)
-//	codeRepository := repository.NewCodeRepository(codeCache)
-//	smsService := ioc.InitSMSService()
-//	codeService := service.NewCodeService(codeRepository, smsService)
-//	userHandler := web.NewUserHandler(userService, codeService)
-//	engine := ioc.InitWebServer(v, userHandler)
-//	return engine
-//}
+//	func InitWebServer() *gin.Engine {
+//		cmdable := ioc.InitRedis()
+//		loggerV1 := ioc.InitLogger()
+//		v := ioc.InitMiddlewares(cmdable, loggerV1)
+//		db := ioc.InitDB(loggerV1)
+//		userDAO := dao.NewUserDao(db)
+//		userCache := cache.NewUserCache(cmdable)
+//		userRepository := repository.NewUserRepository(userDAO, userCache)
+//		userService := service.NewUserService(userRepository, loggerV1)
+//		codeCache := cache.NewCodeCache(cmdable)
+//		codeRepository := repository.NewCodeRepository(codeCache)
+//		smsService := ioc.InitSMSService()
+//		codeService := service.NewCodeService(codeRepository, smsService)
+//		userHandler := web.NewUserHandler(userService, codeService)
+//		engine := ioc.InitWebServer(v, userHandler)
+//		return engine
+//	}
+func initPrometheus() {
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":8081", nil)
+	}()
+}
 
 func initLogger() {
 	logger, err := zap.NewDevelopment()

@@ -39,9 +39,10 @@ type articleService struct {
 	producer events.Producer
 }
 
-func (a *articleService) ListPub(ctx context.Context, start time.Time, offset, limit int) ([]domain.Article, error) {
-	//TODO implement me
-	panic("implement me")
+func (a *articleService) ListPub(ctx context.Context,
+	start time.Time, offset, limit int) ([]domain.Article, error) {
+	return a.repo.ListPub(ctx, start, offset, limit)
+
 }
 
 // 你查询你的文章信息我一个异步去增加阅读次数
